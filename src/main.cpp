@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
+#include <CheapStepper.h>
 
 U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 //U8G2_SSD1306_64X32_NONAME_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
@@ -15,11 +16,19 @@ U8G2_SSD1306_128X64_NONAME_1_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
 
 RtcDS1307<TwoWire> Rtc(Wire);
 
+CheapStepper stepper (8,9,10,11);  
+
 // HX711 circuit wiring
 const int LOADCELL_DOUT_PIN = 2;
 const int LOADCELL_SCK_PIN = 3;
 
 HX711 scale;
+
+ // let's also create a boolean variable to save the direction of our rotation
+ // and a timer variable to keep track of move times
+
+bool moveClockwise = true;
+unsigned long moveStartTime = 0; // this will save the time (millis()) when we started each new move
 
 void draw(const char *s)
 {
@@ -111,6 +120,28 @@ void setup() {
 
             Rtc.SetDateTime(compiled);
         }
+
+
+  Serial.print("stepper RPM: "); Serial.print(stepper.getRpm());
+  Serial.println();
+
+  // and let's print the delay time (in microseconds) between each step
+  // the delay is based on the RPM setting:
+  // it's how long the stepper will wait before each step
+
+  Serial.print("stepper delay (micros): "); Serial.print(stepper.getDelay());
+  Serial.println(); Serial.println();
+
+  // now let's set up our first move...
+  // let's move a half rotation from the start point
+
+  stepper.newMoveTo(moveClockwise, 2048);
+  /* this is the same as: 
+   * stepper.newMoveToDegree(clockwise, 180);
+   * because there are 4096 (default) steps in a full rotation
+   */
+  moveStartTime = millis(); // let's save the time at which we started this move
+
     }
 
     if (!Rtc.GetIsRunning())
@@ -192,7 +223,46 @@ void loop() {
 
     printTime(now);
     Serial.println();
-    delay(1000); // ten seconds
+    //delay(1000); // ten seconds
+
+  // we need to call run() during loop() 
+  // in order to keep the stepper moving
+  // if we are using non-blocking moves
+  
+  stepper.run();
+
+  ////////////////////////////////
+  // now the stepper is moving, //
+  // let's do some other stuff! //
+  ////////////////////////////////
+
+  // let's check how many steps are left in the current move:
+  
+  int stepsLeft = stepper.getStepsLeft();
+
+  // if the current move is done...
+  
+  if (stepsLeft == 0){
+
+    // let's print the position of the stepper to serial
+    
+    Serial.print("stepper position: "); Serial.print(stepper.getStep());
+    Serial.println();
+
+    // and now let's print the time the move took
+
+    unsigned long timeTook = millis() - moveStartTime; // calculate time elapsed since move start
+    Serial.print("move took (ms): "); Serial.print(timeTook);
+    Serial.println(); Serial.println();
+    
+    // let's start a new move in the reverse direction
+    
+    moveClockwise = !moveClockwise; // reverse direction
+    stepper.newMoveDegrees (moveClockwise, 180); // move 180 degrees from current position
+    moveStartTime = millis(); // reset move start time
+
+  }
+
 
 
 }
