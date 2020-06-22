@@ -73,7 +73,7 @@ void printTime(const RtcDateTime& dt)
 
 void setup() {
 
-  #pragma region Clock related  
+  #pragma region ClockRelated  
 
   pinMode(LED_BUILTIN, OUTPUT);
   u8g2.begin();
@@ -138,15 +138,15 @@ void setup() {
   {
       Serial.println("RTC is the same as compile time! (not expected but all is fine)");
   }
-
+ 
   // never assume the Rtc was last configured by you, so
   // just clear them to your needed state
   Rtc.SetSquareWavePin(DS1307SquareWaveOut_Low); 
 
 
-#pragma endregion
+ #pragma endregion ClockRelated
 
-  #pragma region Stepper related
+  #pragma region StepperRelated
 
   //*********************************************************************
   //stepper ralated code from lib sample
@@ -170,12 +170,14 @@ void setup() {
     */
   moveStartTime = millis(); // let's save the time at which we started this move
 
-  #pragma endregion
+  #pragma endregion StepperRelated
 
   #pragma region scale
+  
   //scale related 
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  #pragma endregion
+  
+  #pragma endregion scale
 
 }
 
