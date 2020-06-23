@@ -271,41 +271,192 @@ void loop() {
     }
   }
 
-  if(buttonState3==ButtonStatusSetTime)
+  if(buttonState3==1)
   {
     button3Pressed = false;
   }
 
-  if (buttonState3 == ButtonStatusOpenClose) {
+  if (buttonState3 == 0) {
     //mode = 1; // motor runs
     if(!button3Pressed)
     {
       switch(buttonStatus) {
         case ButtonStatusSetTime: 
           buttonStatus = ButtonStatusSetAlarm;
-          //displayText = "Mode: Set Alarm";
-          //RTC.adjust(DateTime(__DATE__, __TIME__));
-          RTC.adjust(DateTime(2019,1,21,clockHr,clockMin,0));
+          RtcDateTime newTime = RtcDateTime(2019,1,1,clockHr,clockMin,0);
+          Rtc.SetDateTime(newTime);
           break;
-        case 2:
-          buttonStatus = 0;
-          displayText = "Mode: O/C ";
+        case ButtonStatusSetAlarm:
+          buttonStatus = ButtonStatusOpenClose;
           //burada alarm değeri değişmiş ise eproma kayıt etmesi lazım. elektrik gidince yeniden okur
-          //
           break;
-        
-        case 0:
-          buttonStatus = 1;
-          displayText = "Mode: Set Time";
+        case ButtonStatusOpenClose:
+          buttonStatus = ButtonStatusSetTime;
           break;
       }
       button3Pressed = true;
     }
   }
 
+  if(buttonState2 == 1)
+  { 
+    button2Pressed = false;
+  }
 
+  if (buttonState2 == 0) {
+    if(!button2Pressed)
+    {
+      if(buttonStatus==ButtonStatusSetAlarm)
+      {
+        alarmMin = alarmMin + 10;
+        if(alarmMin==60) {alarmMin = 0;}
+      }
+      if(buttonStatus == ButtonStatusSetTime)
+      {
+        clockMin = now.Minute();
+        clockMin = clockMin + 1;
+        if(clockMin == 60) {clockMin = 0;}
+        RtcDateTime newTime = (2019,1,21,now.Hour(),clockMin,0);
+        Rtc.SetDateTime(newTime);
+      }
+    }
+    button2Pressed = true;
+  }
+
+  if(buttonState1 == 1)
+  { 
+    button1Pressed = false;
+  }
+
+  if (buttonState1 == 0) {
+    timerCount = 0;
+    if(!button1Pressed)
+    {
+      if(buttonStatus==ButtonStatusSetTime)
+      {
+        clockHr = now.Hour();
+        clockHr = clockHr + 1;
+        if(clockHr == 24) { clockHr = 0;}
+        RtcDateTime newTime = (2019,1,21,clockHr,now.Minute(),0);
+        Rtc.SetDateTime(newTime);        
+      }
+
+      if(buttonStatus==ButtonStatusSetAlarm)
+      {
+        alarmHr = alarmHr + 1;
+        if(alarmHr == 24) { alarmHr = 0;}
+      }
+
+      if(buttonStatus==ButtonStatusOpenClose)
+      {
+        if(mode==ModeDoNothing)
+        {
+          if(positionKnown)
+          {
+            if(doorStatus == DoorStatusClosed) 
+            {
+              mode = ModeDisplayOpening;
+            }
+            else //DoorOpen
+            {
+              mode = ModeDisplayClosing;
+            }
+          }
+          else
+          {
+            mode = ModeDisplayInit;      
+          }
+        }
+      }
+    }
+    button1Pressed = true;
+  }
+
+  //check if door reached init pos. 
+  //This is needed for first time zero point detection
+  if (stopPinState == 0) {
+    if(mode==ModeInitPos)
+    {
+      mode = ModeInitPosAchieved;
+    }
+  }
 
 #pragma endregion buttonStates
+
+
+
+// Modes 
+#pragma region Modes
+
+  if(mode==ModeInitPosAchieved)
+  {
+    positionKnown = true; //emergency stop
+    doorStatus = DoorStatusClosed;
+    mode = ModeDisplayOpening; //door is opening
+    timerCount = 0;
+  }
+
+  if(mode==ModeTimeForFood) //yemek vakti
+  {
+    mode = ModeDisplayOpening;
+    delay(2000);  //tekrar alarm tetiklenmesin diye 2 saniye sonra açar  
+    buttonStatus = ButtonStatusOpenClose;    
+  }
+
+  if(mode==2)
+  {
+    stepper.newMoveTo(moveClockwise, 50);
+    timerCount = timerCount +1;
+  }
+
+  if(timerCount>50)
+  {
+    mode = 0;
+    displayText = "Error";
+  }
+
+  if(mode==1)
+  {
+    displayText = "Init..";
+    mode = 2;
+  }
+
+  if(mode==4)
+  {
+    stepper.newMoveTo(moveClockwise, -slideDistance);
+    mode = 0;
+    displayText = "Open";
+    doorStatus = 2;
+  }
+
+  if(mode==3)
+  {
+    if(doorStatus==1)
+    {
+      displayText = "Opening..";
+      mode = 4;
+      doorStatus = 0;
+    }
+  }
+
+  if(mode==6)
+  {
+    myStepper.step(slideDistance);
+    mode = 0;
+    displayText = "Closed";    
+    doorStatus = 1;
+  }
+
+  if(mode==5)
+  {
+    displayText = "Closing...";    
+    mode = 6;
+    doorStatus = 0;
+  }
+
+#pragma endregion Modes
+
+
 
 
 
