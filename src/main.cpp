@@ -284,10 +284,12 @@ void loop() {
     {
       switch(buttonStatus) {
         case ButtonStatusSetTime: 
+        {
           buttonStatus = ButtonStatusSetAlarm;
-          RtcDateTime newTime = RtcDateTime(2019,1,1,clockHr,clockMin,0);
-          Rtc.SetDateTime(newTime);
+          RtcDateTime SetTime = RtcDateTime(2019,1,1,clockHr,clockMin,0);
+          Rtc.SetDateTime(SetTime);
           break;
+        }
         case ButtonStatusSetAlarm:
           buttonStatus = ButtonStatusOpenClose;
           //burada alarm değeri değişmiş ise eproma kayıt etmesi lazım. elektrik gidince yeniden okur
@@ -318,8 +320,8 @@ void loop() {
         clockMin = now.Minute();
         clockMin = clockMin + 1;
         if(clockMin == 60) {clockMin = 0;}
-        RtcDateTime newTime = (2019,1,21,now.Hour(),clockMin,0);
-        Rtc.SetDateTime(newTime);
+        RtcDateTime setTime = RtcDateTime(2019, 1, 21, now.Hour(), clockMin, 0);
+        Rtc.SetDateTime(setTime);
       }
     }
     button2Pressed = true;
@@ -339,8 +341,8 @@ void loop() {
         clockHr = now.Hour();
         clockHr = clockHr + 1;
         if(clockHr == 24) { clockHr = 0;}
-        RtcDateTime newTime = (2019,1,21,clockHr,now.Minute(),0);
-        Rtc.SetDateTime(newTime);        
+        RtcDateTime setTime = RtcDateTime(2019,1,21,clockHr,now.Minute(),0);
+        Rtc.SetDateTime(setTime);        
       }
 
       if(buttonStatus==ButtonStatusSetAlarm)
