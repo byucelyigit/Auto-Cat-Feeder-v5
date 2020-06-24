@@ -52,6 +52,7 @@ int clockMin = 0;
 #define ModeInitPosAchieved 7
 #define ModeTimeForFood 8
 #define ModeEndOfTimeForFood 9
+#define ModeError 10
 
 #define DoorStatusUnkonwn 0
 #define DoorStatusClosed 1
@@ -64,11 +65,11 @@ int clockMin = 0;
 
 
 //used for oled display
-void DrawToOled(const char *s)
+void DrawToOled(int x, int y, const char *s)
 {
   u8g2.firstPage();
   do {
-    u8g2.drawStr(2,30,s);    
+    u8g2.drawStr(x,y,s);    
     //u8g2.drawFrame(0,0,u8g2.getDisplayWidth(),u8g2.getDisplayHeight() );
   } while ( u8g2.nextPage() );
 }
@@ -88,10 +89,10 @@ void printDateTime(const RtcDateTime& dt)
             dt.Minute(),
             dt.Second() );
     Serial.print(datestring);
-    DrawToOled(datestring);
+    DrawToOled(2, 30, datestring);
 }
 
-void printTime(const RtcDateTime& dt)
+void printTime(int x, int y, const RtcDateTime& dt)
 {
     char datestring[10];
 
@@ -102,8 +103,10 @@ void printTime(const RtcDateTime& dt)
             dt.Minute(),
             dt.Second() );
     Serial.print(datestring);
-    DrawToOled(datestring);
+    DrawToOled(x, y, datestring);
 }
+
+
 
 
 void setup() {
@@ -115,7 +118,7 @@ void setup() {
 
   //oled related
   u8g2.begin();
-  u8g2.setFont(u8g2_font_9x15B_mf);
+
 
   //scale related 
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
@@ -239,7 +242,6 @@ void loop() {
 
   RtcDateTime now = Rtc.GetDateTime();
 
-  printTime(now);
   Serial.println();
   clockMin = now.Minute();
   clockHr = now.Hour();
@@ -262,7 +264,7 @@ void loop() {
   int buttonState2 = digitalRead(button2Pin);
   int buttonState3 = digitalRead(button3Pin);
   int stopPinState = digitalRead(stopPin);
-  if(mode==ModeDoNothing)
+  if(mode==ModeDoNothing || mode == ModeError)
   {
     if((clockMin==alarmMin) && (clockHr==alarmHr) && (now.Second() == 0))
     {
@@ -349,7 +351,7 @@ void loop() {
 
       if(buttonStatus==ButtonStatusOpenClose)
       {
-        if(mode==ModeDoNothing)
+        if(mode==ModeDoNothing || mode == ModeError)
         {
           if(positionKnown)
           {
@@ -383,8 +385,6 @@ void loop() {
 
 #pragma endregion buttonStates
 
-
-
 // Modes 
 #pragma region Modes
 
@@ -403,59 +403,72 @@ void loop() {
     buttonStatus = ButtonStatusOpenClose;    
   }
 
-  if(mode==2)
+  if(mode == ModeInitPos)
   {
     stepper.newMoveTo(moveClockwise, 50);
     timerCount = timerCount +1;
   }
 
-  if(timerCount>50)
+  if(timerCount > 50)
   {
-    mode = 0;
-    displayText = "Error";
+    mode = ModeError;
   }
 
-  if(mode==1)
+  if(mode == ModeDisplayInit)
   {
-    displayText = "Init..";
-    mode = 2;
+    mode = ModeInitPos;
   }
 
-  if(mode==4)
+  if(mode == ModeRunForOpen)
   {
     stepper.newMoveTo(moveClockwise, -slideDistance);
-    mode = 0;
-    displayText = "Open";
-    doorStatus = 2;
+    mode = ModeDoNothing;
+    doorStatus = DoorStatusopen;
   }
 
-  if(mode==3)
+  if(mode == ModeDisplayOpening)
   {
-    if(doorStatus==1)
+    if(doorStatus == DoorStatusClosed)
     {
-      displayText = "Opening..";
-      mode = 4;
-      doorStatus = 0;
+      mode = ModeRunForOpen;
+      doorStatus = DoorStatusUnkonwn;
     }
   }
 
-  if(mode==6)
+  if(mode == ModeRunForClose)
   {
-    myStepper.step(slideDistance);
-    mode = 0;
-    displayText = "Closed";    
-    doorStatus = 1;
+    stepper.newMoveTo(moveClockwise, slideDistance);
+    mode = ModeDoNothing;
+    doorStatus = DoorStatusClosed;
   }
 
-  if(mode==5)
+  if(mode == ModeDisplayClosing)
   {
-    displayText = "Closing...";    
-    mode = 6;
-    doorStatus = 0;
+    mode = ModeRunForClose;
+    doorStatus = DoorStatusUnkonwn;
   }
 
 #pragma endregion Modes
 
+//display statüs ve other information
+
+      u8g2.setFont(u8g2_font_9x15B_mf);
+      switch(mode) {
+        case ModeDoNothing: DrawToOled(0,0,"...");break;
+        case ModeDisplayInit: DrawToOled(0,0,"Initializing...");break;
+        case ModeInitPos: DrawToOled(0,0,"Initializing...");break;        
+        case ModeDisplayOpening: DrawToOled(0,0,"Opening...");break;        
+        case ModeRunForOpen: DrawToOled(0,0,"Open");break;        
+        case ModeDisplayClosing: DrawToOled(0,0,"Closing...");break;                
+        case ModeRunForClose: DrawToOled(0,0,"Closed");break;                        
+        case ModeInitPosAchieved: DrawToOled(0,0,"Ready");break; 
+        case ModeTimeForFood: DrawToOled(0,0,"Time for food");break;                                                              
+        case ModeEndOfTimeForFood: DrawToOled(0,0,"Time for food");break;
+        case ModeError: DrawToOled(0,0,"Error");break;
+      }
+
+      printTime(2, 30, now);
+      printTime(3, 30, RtcDateTime(2000,1, 1, alarmHr, alarmMin, 0));
 
 
 
@@ -503,6 +516,8 @@ void loop() {
 
 
 }
+
+
 
 
 
