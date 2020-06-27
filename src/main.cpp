@@ -13,8 +13,8 @@ RtcDS1307<TwoWire> Rtc(Wire);
 CheapStepper stepper (8,9,10,11);  
 
 // HX711 circuit wiring
-const int LOADCELL_DOUT_PIN = 2;
-const int LOADCELL_SCK_PIN = 3;
+const int LOADCELL_DOUT_PIN = 7;
+const int LOADCELL_SCK_PIN = 6;
 
 HX711 scale;
 
@@ -150,20 +150,26 @@ void printTimeAndAlarm(const RtcDateTime& dt, const RtcDateTime& alrm, String st
 
 void setup() {
 
+  pinMode(button1Pin, INPUT_PULLUP);
+  pinMode(button2Pin, INPUT_PULLUP);
+  pinMode(button3Pin, INPUT_PULLUP);
+  pinMode(stopPin, INPUT_PULLUP);
 
   pinMode(LED_BUILTIN, OUTPUT);
 
   Serial.begin(9600);
+   Serial.print("start");
 
   //oled related
   u8g2.begin();
 
 
   //scale related 
+  Serial.print("scale start");
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
   scale.set_scale(-1050.f);                      // this value is obtained by calibrating the scale with known weights; see the README for details
   scale.tare();	
-
+  Serial.print("scale ok");
   
   //Clock related
   #pragma region ClockRelated  
@@ -318,6 +324,7 @@ void loop() {
 
   if(buttonState3==1)
   {
+    Serial.println("button 3 pressed");
     button3Pressed = false;
   }
 
@@ -497,20 +504,28 @@ void loop() {
 
 //display statüs ve other information
 
-      String status = "---";
+      String info = "---";
+      String status = "";
+
+      switch(buttonStatus)
+      {
+        case ButtonStatusOpenClose: status = "Open/Close";break;
+        case ButtonStatusSetAlarm: status = "Set Alarm";break;
+        case ButtonStatusSetTime:status  ="Set Time";break;
+      }
       
       switch(mode) {
-        case ModeDoNothing: status = "...";break;
-        case ModeDisplayInit: status = "Initializing...";break;
-        case ModeInitPos: status = "Initializing...";break;        
-        case ModeDisplayOpening: status = "Opening...";break;        
-        case ModeRunForOpen: status = "Open";break;        
-        case ModeDisplayClosing: status = "Closing...";break;                
-        case ModeRunForClose: status = "Closed";break;                        
-        case ModeInitPosAchieved: status = "Ready";break; 
-        case ModeTimeForFood: status = "Time for food";break;                                                              
-        case ModeEndOfTimeForFood: status = "Time for food";break;
-        case ModeError: status = "Error";break;
+        case ModeDoNothing: info = "...";break;
+        case ModeDisplayInit: info = "Initializing...";break;
+        case ModeInitPos: info = "Initializing...";break;        
+        case ModeDisplayOpening: info = "Opening...";break;        
+        case ModeRunForOpen: info = "Open";break;        
+        case ModeDisplayClosing: info = "Closing...";break;                
+        case ModeRunForClose: info = "Closed";break;                        
+        case ModeInitPosAchieved: info = "Ready";break; 
+        case ModeTimeForFood: info = "Time for food";break;                                                              
+        case ModeEndOfTimeForFood: info = "Time for food";break;
+        case ModeError: info = "Error";break;
       }
       
 
