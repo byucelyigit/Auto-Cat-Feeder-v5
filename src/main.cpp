@@ -32,6 +32,7 @@ int buttonStatus = 0;
 int doorStatus = 0;
 bool positionKnown = false;
 
+long reading=0; //scale
 int mode = 0;
 int timerCount = 0;
 bool button3Pressed = false;
@@ -69,7 +70,8 @@ void DrawToOled(int x, int y, const char *s)
 {
   u8g2.firstPage();
   do {
-    u8g2.drawStr(x,y,s);    
+    u8g2.drawStr(x,y,s);
+    u8g2.drawStr(x,y+9,s);
     //u8g2.drawFrame(0,0,u8g2.getDisplayWidth(),u8g2.getDisplayHeight() );
   } while ( u8g2.nextPage() );
 }
@@ -92,9 +94,14 @@ void printDateTime(const RtcDateTime& dt)
     DrawToOled(2, 30, datestring);
 }
 
-void printTime(int x, int y, const RtcDateTime& dt)
+void printTimeAndAlarm(const RtcDateTime& dt, const RtcDateTime& alrm, String statusStr, long weight)
 {
     char datestring[10];
+    char alarmstring[7];
+    char weightString[4];
+    int x,y;
+    x = 2;
+    y = 10;
 
     snprintf_P(datestring, 
             countof(datestring),
@@ -103,7 +110,39 @@ void printTime(int x, int y, const RtcDateTime& dt)
             dt.Minute(),
             dt.Second() );
     Serial.print(datestring);
-    DrawToOled(x, y, datestring);
+
+    snprintf_P(alarmstring, 
+            countof(alarmstring),
+            PSTR("%02u:%02u"),
+            alrm.Hour(),
+            alrm.Minute());
+
+
+  int lenStatusString = statusStr.length();
+  char statusstring[lenStatusString+1];
+    
+  statusStr.toCharArray(statusstring, lenStatusString+1);
+
+    snprintf_P(weightString, 
+            countof(weightString),
+            PSTR("%03u"),
+            weight);
+
+
+  u8g2.firstPage();
+  do {
+    u8g2.setFont(u8g2_font_9x15B_mf);
+    u8g2.drawStr(x, y, statusstring);
+    u8g2.drawStr(x,y+20,datestring);
+    u8g2.setFont(u8g2_font_10x20_mf);
+    u8g2.drawStr(x,y+40,alarmstring);
+    u8g2.setFont(u8g2_font_10x20_mf);
+    u8g2.drawStr(x+60,y+40,weightString);
+
+
+    //u8g2.drawFrame(0,0,u8g2.getDisplayWidth(),u8g2.getDisplayHeight() );
+  } while ( u8g2.nextPage() );            
+
 }
 
 
@@ -122,6 +161,8 @@ void setup() {
 
   //scale related 
   scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  scale.set_scale(-1050.f);                      // this value is obtained by calibrating the scale with known weights; see the README for details
+  scale.tare();	
 
   
   //Clock related
@@ -250,7 +291,9 @@ void loop() {
 
 //Scale **************************************************
   if (scale.is_ready()) {
-    long reading = scale.read();
+    //reading = scale.read();
+    scale.set_scale(1000);
+    reading = scale.get_units(5);
     Serial.print("HX711 reading: ");
     Serial.println(reading);
   } else {
@@ -454,23 +497,25 @@ void loop() {
 
 //display statüs ve other information
 
-      u8g2.setFont(u8g2_font_9x15B_mf);
+      String status = "---";
+      
       switch(mode) {
-        case ModeDoNothing: DrawToOled(0,0,"...");break;
-        case ModeDisplayInit: DrawToOled(0,0,"Initializing...");break;
-        case ModeInitPos: DrawToOled(0,0,"Initializing...");break;        
-        case ModeDisplayOpening: DrawToOled(0,0,"Opening...");break;        
-        case ModeRunForOpen: DrawToOled(0,0,"Open");break;        
-        case ModeDisplayClosing: DrawToOled(0,0,"Closing...");break;                
-        case ModeRunForClose: DrawToOled(0,0,"Closed");break;                        
-        case ModeInitPosAchieved: DrawToOled(0,0,"Ready");break; 
-        case ModeTimeForFood: DrawToOled(0,0,"Time for food");break;                                                              
-        case ModeEndOfTimeForFood: DrawToOled(0,0,"Time for food");break;
-        case ModeError: DrawToOled(0,0,"Error");break;
+        case ModeDoNothing: status = "...";break;
+        case ModeDisplayInit: status = "Initializing...";break;
+        case ModeInitPos: status = "Initializing...";break;        
+        case ModeDisplayOpening: status = "Opening...";break;        
+        case ModeRunForOpen: status = "Open";break;        
+        case ModeDisplayClosing: status = "Closing...";break;                
+        case ModeRunForClose: status = "Closed";break;                        
+        case ModeInitPosAchieved: status = "Ready";break; 
+        case ModeTimeForFood: status = "Time for food";break;                                                              
+        case ModeEndOfTimeForFood: status = "Time for food";break;
+        case ModeError: status = "Error";break;
       }
+      
 
-      printTime(2, 30, now);
-      printTime(3, 30, RtcDateTime(2000,1, 1, alarmHr, alarmMin, 0));
+      printTimeAndAlarm(now, RtcDateTime(2000,1, 1, alarmHr, alarmMin, 0), status, reading);
+      //printTime(2, 60, RtcDateTime(2000,1, 1, alarmHr, alarmMin, 0));
 
 
 
