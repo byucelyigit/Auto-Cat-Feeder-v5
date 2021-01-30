@@ -22,12 +22,14 @@ HX711 scale;
  // and a timer variable to keep track of move times
 bool moveClockwise = true;
 unsigned long moveStartTime = 0; // this will save the time (millis()) when we started each new move
-const int button1Pin = 3; 
-const int button2Pin = 2;               
+const int button1Pin = 2; 
+const int button2Pin = 3;               
 const int button3Pin = 4; //mode
 const int stopPin = 5;
 const int slideDistance = 1750;
 
+bool showScreen = true;
+int screenBlankDelayCount = 0;
 int buttonStatus = 0;
 int doorStatus = 0;
 bool positionKnown = false;
@@ -94,11 +96,12 @@ void printDateTime(const RtcDateTime& dt)
     DrawToOled(2, 30, datestring);
 }
 
-void printTimeAndAlarm(const RtcDateTime& dt, const RtcDateTime& alrm, String statusStr, long weight)
+void printTimeAndAlarm(const RtcDateTime& dt, const RtcDateTime& alrm, String statusStr, long weight, int mode)
 {
     char datestring[10];
     char alarmstring[7];
     char weightString[4];
+    char modeString[2];
     int x,y;
     x = 2;
     y = 10;
@@ -128,6 +131,11 @@ void printTimeAndAlarm(const RtcDateTime& dt, const RtcDateTime& alrm, String st
             PSTR("%03u"),
             weight);
 
+    snprintf_P(modeString, 
+            countof(modeString),
+            PSTR("%01u"),
+            mode);            
+
 
   u8g2.firstPage();
   do {
@@ -138,14 +146,18 @@ void printTimeAndAlarm(const RtcDateTime& dt, const RtcDateTime& alrm, String st
     u8g2.drawStr(x,y+40,alarmstring);
     u8g2.setFont(u8g2_font_10x20_mf);
     u8g2.drawStr(x+60,y+40,weightString);
+    u8g2.setFont(u8g2_font_9x15_mf);
+    //u8g2.drawStr(x+85,y,modeString);
 
 
     //u8g2.drawFrame(0,0,u8g2.getDisplayWidth(),u8g2.getDisplayHeight() );
   } while ( u8g2.nextPage() );            
-
 }
 
-
+void ScreenBlank()
+{
+  u8g2.clear();
+}
 
 
 void setup() {
@@ -241,7 +253,7 @@ void setup() {
 
   //*********************************************************************
   //stepper ralated code from lib sample
-  unsigned long moveStartTime = 0;
+  
   stepper.setRpm(12);
   Serial.print("stepper RPM: "); Serial.print(stepper.getRpm());
   Serial.println();
@@ -315,6 +327,13 @@ void loop() {
   int buttonState2 = digitalRead(button2Pin);
   int buttonState3 = digitalRead(button3Pin);
   int stopPinState = digitalRead(stopPin);
+
+  Serial.print("B1-");Serial.println(buttonState1);
+  Serial.print("B2-");Serial.println(buttonState2);
+  Serial.print("B3-");Serial.println(buttonState3);
+  Serial.print("S1-");Serial.println(stopPinState);
+  
+
   if(mode==ModeDoNothing || mode == ModeError)
   {
     if((clockMin==alarmMin) && (clockHr==alarmHr) && (now.Second() == 0))
@@ -324,16 +343,16 @@ void loop() {
     }
   }
 
-  if(buttonState3==1)
+  if(buttonState3==0)
   {
-    //Serial.println("button 3 pressed");
     button3Pressed = false;
   }
 
-  if (buttonState3 == 0) {
+  if (buttonState3 == 1) {
     //mode = 1; // motor runs
     if(!button3Pressed)
     {
+      //Sets  mode of the system:
       switch(buttonStatus) {
         case ButtonStatusSetTime: 
         {
@@ -349,17 +368,17 @@ void loop() {
         case ButtonStatusOpenClose:
           buttonStatus = ButtonStatusSetTime;
           break;
-      }
+      }                                               
       button3Pressed = true;
     }
   }
 
-  if(buttonState2 == 1)
+  if(buttonState2 == 0)
   { 
     button2Pressed = false;
   }
 
-  if (buttonState2 == 0) {
+  if (buttonState2 == 1) {
     if(!button2Pressed)
     {
       if(buttonStatus==ButtonStatusSetAlarm)
@@ -379,13 +398,14 @@ void loop() {
     button2Pressed = true;
   }
 
-  if(buttonState1 == 1)
+  if(buttonState1 == 0)
   { 
     button1Pressed = false;
   }
 
-  if (buttonState1 == 0) {
+  if (buttonState1 == 1) {
     timerCount = 0;
+    screenBlankDelayCount = 0;
     if(!button1Pressed)
     {
       if(buttonStatus==ButtonStatusSetTime)
@@ -430,7 +450,7 @@ void loop() {
 
   //check if door reached init pos. 
   //This is needed for first time zero point detection
-  if (stopPinState == 0) {
+  if (stopPinState == 1) {
     if(mode==ModeInitPos)
     {
       mode = ModeInitPosAchieved;
@@ -459,7 +479,7 @@ void loop() {
 
   if(mode == ModeInitPos)
   {
-    stepper.newMoveTo(moveClockwise, 50);
+    stepper.newMoveDegrees (moveClockwise, 90);
     timerCount = timerCount +1;
   }
 
@@ -475,7 +495,9 @@ void loop() {
 
   if(mode == ModeRunForOpen)
   {
-    stepper.newMoveTo(moveClockwise, -slideDistance);
+    Serial.print("ModeRunForOpen");
+    stepper.moveDegrees (moveClockwise, 90);
+    //stepper.newMoveTo(moveClockwise, -slideDistance);
     mode = ModeDoNothing;
     doorStatus = DoorStatusopen;
   }
@@ -491,7 +513,8 @@ void loop() {
 
   if(mode == ModeRunForClose)
   {
-    stepper.newMoveTo(moveClockwise, slideDistance);
+    Serial.print("ModeRunForClose");
+    //stepper.newMoveTo(moveClockwise, slideDistance);
     mode = ModeDoNothing;
     doorStatus = DoorStatusClosed;
   }
@@ -529,60 +552,30 @@ void loop() {
         case ModeEndOfTimeForFood: info = "Time for food";break;
         case ModeError: info = "Error";break;
       }
-      
-
-      printTimeAndAlarm(now, RtcDateTime(2000,1, 1, alarmHr, alarmMin, 0), status, reading);
-      //printTime(2, 60, RtcDateTime(2000,1, 1, alarmHr, alarmMin, 0));
+      Serial.print(info);
 
 
-
-
-    //delay(1000); // ten seconds
-
-  // we need to call run() during loop() 
-  // in order to keep the stepper moving
-  // if we are using non-blocking moves
-  
-  stepper.moveDegrees (moveClockwise, 90);
-  //stepper.run();
-
-  //stepper.newMoveDegrees (moveClockwise, 180);
-  Serial.print("stepper position: "); Serial.print(stepper.getStep());
-
-  ////////////////////////////////
-  // now the stepper is moving, //
-  // let's do some other stuff! //
-  ////////////////////////////////
-
-  // let's check how many steps are left in the current move:
-  
-  int stepsLeft = stepper.getStepsLeft();
-
-  // if the current move is done...
-  
-  if (stepsLeft == 0){
-
-    // let's print the position of the stepper to serial
     
-    Serial.print("stepper position: "); Serial.print(stepper.getStep());
-    Serial.println();
 
-    // and now let's print the time the move took
-
-    unsigned long timeTook = millis() - moveStartTime; // calculate time elapsed since move start
-    Serial.print("move took (ms): "); Serial.print(timeTook);
-    Serial.println(); Serial.println();
+    if(screenBlankDelayCount < 50)
+    {
+        screenBlankDelayCount++;
+        showScreen = true;
+    }
+    else
+    {
+        showScreen = false;
+    }
     
-    // let's start a new move in the reverse direction
+    if(showScreen)
+    {
+      printTimeAndAlarm(now, RtcDateTime(2000,1, 1, alarmHr, alarmMin, 0), status, reading, mode);
+    }
+    else
+    {
+      ScreenBlank();
+    }
     
-    moveClockwise = !moveClockwise; // reverse direction
-    stepper.newMoveDegrees (moveClockwise, 180); // move 180 degrees from current position
-    moveStartTime = millis(); // reset move start time
-
-  }
-
-
-
 }
 
 
