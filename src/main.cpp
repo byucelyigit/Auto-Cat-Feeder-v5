@@ -241,6 +241,8 @@ void setup() {
 
   //*********************************************************************
   //stepper ralated code from lib sample
+  unsigned long moveStartTime = 0;
+  stepper.setRpm(12);
   Serial.print("stepper RPM: "); Serial.print(stepper.getRpm());
   Serial.println();
 
@@ -254,7 +256,7 @@ void setup() {
   // now let's set up our first move...
   // let's move a half rotation from the start point
 
-  stepper.newMoveTo(moveClockwise, 2048);
+  stepper.newMoveTo(moveClockwise, 4096);
   /* this is the same as: 
     * stepper.newMoveToDegree(clockwise, 180);
     * because there are 4096 (default) steps in a full rotation
@@ -324,7 +326,7 @@ void loop() {
 
   if(buttonState3==1)
   {
-    Serial.println("button 3 pressed");
+    //Serial.println("button 3 pressed");
     button3Pressed = false;
   }
 
@@ -541,7 +543,11 @@ void loop() {
   // in order to keep the stepper moving
   // if we are using non-blocking moves
   
-  stepper.run();
+  stepper.moveDegrees (moveClockwise, 90);
+  //stepper.run();
+
+  //stepper.newMoveDegrees (moveClockwise, 180);
+  Serial.print("stepper position: "); Serial.print(stepper.getStep());
 
   ////////////////////////////////
   // now the stepper is moving, //
